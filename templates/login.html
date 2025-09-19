@@ -1,0 +1,60 @@
+{% extends "layout.html" %}
+
+{% block title %}Login - Rajasthan Digi-Shala{% endblock %}
+
+{% block content %}
+<div style="max-width: 450px; margin: 2rem auto;">
+    <div class="card">
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <i class="fas fa-sign-in-alt" style="font-size: 3rem; color: #4F46E5; margin-bottom: 1rem;"></i>
+            <h1 style="color: #374151; font-weight: 600; font-size: 1.8rem; margin-bottom: 0.5rem;">
+                Welcome Back!
+            </h1>
+            <p style="color: #6B7280;">
+                Sign in to continue your learning journey
+            </p>
+        </div>
+
+        <form method="POST">
+            <div class="form-group">
+                <label for="username">
+                    <i class="fas fa-user"></i> Username
+                </label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">
+                    <i class="fas fa-lock"></i> Password
+                </label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-bottom: 1rem;">
+                <i class="fas fa-sign-in-alt"></i> Sign In
+            </button>
+        </form>
+        
+        <div style="text-align: center; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #E5E7EB;">
+            <p style="color: #6B7280; margin-bottom: 1rem;">
+                Don't have an account?
+            </p>
+            <a href="{{ url_for('register') }}" class="btn btn-outline" style="width: 100%;">
+                <i class="fas fa-user-plus"></i> Create New Account
+            </a>
+        </div>
+        
+        <div style="margin-top: 2rem; padding: 1rem; background: #FEF3C7; border-radius: 8px; border-left: 4px solid #F59E0B;">
+            <h4 style="color: #92400E; font-size: 0.9rem; margin-bottom: 0.5rem;">
+                <i class="fas fa-info-circle"></i> Demo Accounts
+            </h4>
+            <p style="color: #92400E; font-size: 0.85rem; margin-bottom: 0.5rem;">
+                Teacher: <strong>teacher1</strong> / password123
+            </p>
+            <p style="color: #92400E; font-size: 0.85rem;">
+                Student: <strong>student1</strong> / password123
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
