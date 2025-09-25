@@ -5,19 +5,15 @@ from werkzeug.utils import secure_filename
 import os
 from datetime import datetime, date
 import json
-# Import the new database connection function
 from database import init_db, get_db_connection
 import psycopg2
 
 app = Flask(__name__)
-# It's a good practice to get the secret key from an environment variable
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-default-fallback-secret-key')
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
-# Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Flask-Login setup
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -37,7 +33,6 @@ def load_user(user_id):
     cur.close()
     conn.close()
     if user:
-        # Access columns by index or key if using DictCursor
         return User(user['id'], user['username'], user['role'])
     return None
 
@@ -77,7 +72,6 @@ def register():
         conn = get_db_connection()
         cur = conn.cursor()
 
-        # Check if user already exists
         cur.execute('SELECT * FROM users WHERE username = %s', (username,))
         existing_user = cur.fetchone()
         if existing_user:
@@ -86,7 +80,6 @@ def register():
             conn.close()
             return render_template('register.html')
 
-        # Create new user
         password_hash = generate_password_hash(password)
         cur.execute('INSERT INTO users (username, password_hash, role) VALUES (%s, %s, %s)',
                     (username, password_hash, role))
@@ -122,7 +115,7 @@ def dashboard():
         courses = cur.fetchall()
         available_courses = []
 
-    else:  # Student
+    else:
         cur.execute('''
             SELECT c.*, u.username as teacher_name,
             (SELECT COUNT(*) FROM attendance WHERE student_id = %s AND course_id = c.id AND status = 'present') as present_count,
@@ -190,7 +183,6 @@ def course(course_id):
         conn.close()
         return redirect(url_for('dashboard'))
 
-    # Check access
     if current_user.role == 'student':
         cur.execute('SELECT * FROM enrollment WHERE user_id = %s AND course_id = %s',
                     (current_user.id, course_id))
@@ -421,8 +413,5 @@ def manifest():
     })
 
 if __name__ == '__main__':
-    # Initialize the database schema if running this script directly
-    # In a production environment on Render, you might run this from the shell
-    init_db()
-    # For local testing, you might use a different port
-    app.run(debug=True, port=5001)
+    # REMOVED init_db() from here
+    app.run(debug=True)
