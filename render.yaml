@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: rajasthan-digi-shala
+    runtime: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true # Render will automatically generate a secure secret key
+      - key: DATABASE_URL
+        fromDatabase:
+          name: digishala-db
+          property: connectionString
+
+databases:
+  - name: digishala-db
+    databaseName: digishala_db
+    user: digishala_user
+    plan: free # Important: This uses the free tier for your database
