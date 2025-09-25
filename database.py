@@ -2,34 +2,21 @@ import os
 import psycopg2
 from psycopg2.extras import DictCursor
 
-# Get the database connection URL from the environment variables
-DATABASE_URL = os.environ.get('DATABASE_URL')
-
 def get_db_connection():
-    """
-    Establishes a connection to the PostgreSQL database.
-    The connection string is retrieved from the DATABASE_URL environment
-    variable, which is the standard practice for services like Render.
-    """
+    DATABASE_URL = os.environ.get('DATABASE_URL')
+    if DATABASE_URL is None:
+        raise Exception("DATABASE_URL environment variable not set")
     try:
         conn = psycopg2.connect(DATABASE_URL, sslmode='require')
-        # Use DictCursor to get rows as dictionaries (like sqlite3.Row)
         conn.cursor_factory = DictCursor
         return conn
     except psycopg2.OperationalError as e:
-        # A more descriptive error message for connection issues
         raise Exception(f"Error connecting to the database: {e}")
 
 def init_db():
-    """
-    Initializes the database schema.
-    This function creates all the necessary tables if they don't already exist.
-    It's safe to run this multiple times.
-    """
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Users table
     cur.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
@@ -40,7 +27,6 @@ def init_db():
         );
     ''')
 
-    # Courses table
     cur.execute('''
         CREATE TABLE IF NOT EXISTS courses (
             id SERIAL PRIMARY KEY,
@@ -52,7 +38,6 @@ def init_db():
         );
     ''')
 
-    # Enrollment table
     cur.execute('''
         CREATE TABLE IF NOT EXISTS enrollment (
             id SERIAL PRIMARY KEY,
@@ -65,7 +50,6 @@ def init_db():
         );
     ''')
 
-    # Materials table
     cur.execute('''
         CREATE TABLE IF NOT EXISTS materials (
             id SERIAL PRIMARY KEY,
@@ -77,7 +61,6 @@ def init_db():
         );
     ''')
 
-    # Attendance table
     cur.execute('''
         CREATE TABLE IF NOT EXISTS attendance (
             id SERIAL PRIMARY KEY,
@@ -92,7 +75,6 @@ def init_db():
         );
     ''')
 
-    # Posts table (for forum)
     cur.execute('''
         CREATE TABLE IF NOT EXISTS posts (
             id SERIAL PRIMARY KEY,
@@ -105,7 +87,6 @@ def init_db():
         );
     ''')
 
-    # Replies table (for forum)
     cur.execute('''
         CREATE TABLE IF NOT EXISTS replies (
             id SERIAL PRIMARY KEY,
@@ -124,9 +105,4 @@ def init_db():
     print("Database schema initialized.")
 
 if __name__ == '__main__':
-    # This allows you to run `python database.py` to set up the schema
-    # after you've set the DATABASE_URL environment variable.
-    if not DATABASE_URL:
-        print("Error: DATABASE_URL environment variable not set.")
-    else:
-        init_db()
+    init_db()
