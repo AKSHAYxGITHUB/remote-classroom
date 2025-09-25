@@ -1,0 +1,68 @@
+{% extends "layout.html" %}
+
+{% block title %}Register - Rajasthan Digi-Shala{% endblock %}
+
+{% block content %}
+<div style="max-width: 450px; margin: 2rem auto;">
+    <div class="card">
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <i class="fas fa-user-plus" style="font-size: 3rem; color: #F59E0B; margin-bottom: 1rem;"></i>
+            <h1 style="color: #374151; font-weight: 600; font-size: 1.8rem; margin-bottom: 0.5rem;">
+                Join Digi-Shala
+            </h1>
+            <p style="color: #6B7280;">
+                Create your account and start learning today
+            </p>
+        </div>
+
+        <form method="POST">
+            <div class="form-group">
+                <label for="username">
+                    <i class="fas fa-user"></i> Username
+                </label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">
+                    <i class="fas fa-lock"></i> Password
+                </label>
+                <input type="password" id="password" name="password" required minlength="6">
+            </div>
+            
+            <div class="form-group">
+                <label for="role">
+                    <i class="fas fa-user-tag"></i> I am a...
+                </label>
+                <select id="role" name="role" required>
+                    <option value="">Select your role</option>
+                    <option value="student">Student - I want to learn</option>
+                    <option value="teacher">Teacher - I want to teach</option>
+                </select>
+            </div>
+            
+            <button type="submit" class="btn btn-secondary" style="width: 100%; margin-bottom: 1rem;">
+                <i class="fas fa-rocket"></i> Create Account
+            </button>
+        </form>
+        
+        <div style="text-align: center; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #E5E7EB;">
+            <p style="color: #6B7280; margin-bottom: 1rem;">
+                Already have an account?
+            </p>
+            <a href="{{ url_for('login') }}" class="btn btn-outline" style="width: 100%;">
+                <i class="fas fa-sign-in-alt"></i> Sign In Instead
+            </a>
+        </div>
+        
+        <div style="margin-top: 2rem; padding: 1rem; background: #DBEAFE; border-radius: 8px; border-left: 4px solid #4F46E5;">
+            <h4 style="color: #1E40AF; font-size: 0.9rem; margin-bottom: 0.5rem;">
+                <i class="fas fa-shield-alt"></i> Your Data is Safe
+            </h4>
+            <p style="color: #1E40AF; font-size: 0.85rem;">
+                We never share your personal information with third parties. Your privacy is our priority.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

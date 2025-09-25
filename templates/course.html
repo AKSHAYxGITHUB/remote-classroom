@@ -1,0 +1,569 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ course.title }} - Rajasthan Digi-Shala{% endblock %}
+
+{% block extra_css %}
+<style>
+    .course-header {
+        background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 16px;
+        margin-bottom: 2rem;
+    }
+    
+    .section-tabs {
+        display: flex;
+        background: white;
+        border-radius: 12px;
+        padding: 0.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        overflow-x: auto;
+    }
+    
+    .tab-btn {
+        flex: 1;
+        padding: 0.75rem 1rem;
+        border: none;
+        background: transparent;
+        border-radius: 8px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        white-space: nowrap;
+    }
+    
+    .tab-btn.active {
+        background: #4F46E5;
+        color: white;
+    }
+    
+    .tab-content {
+        display: none;
+    }
+    
+    .tab-content.active {
+        display: block;
+    }
+    
+    .material-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem;
+        background: #F8FAFC;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+    }
+    
+    .material-info {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .material-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .chat-container {
+        background: white;
+        border-radius: 12px;
+        height: 400px;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .chat-messages {
+        flex: 1;
+        padding: 1rem;
+        overflow-y: auto;
+        border-bottom: 1px solid #E5E7EB;
+    }
+    
+    .chat-input {
+        padding: 1rem;
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .message {
+        margin-bottom: 1rem;
+        padding: 0.75rem;
+        border-radius: 12px;
+        max-width: 80%;
+    }
+    
+    .message.user {
+        background: #4F46E5;
+        color: white;
+        margin-left: auto;
+    }
+    
+    .message.ai {
+        background: #F3F4F6;
+        color: #374151;
+    }
+    
+    .forum-post {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+    
+    .post-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #E5E7EB;
+    }
+    
+    .attendance-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1rem;
+    }
+    
+    .attendance-table th,
+    .attendance-table td {
+        padding: 0.75rem;
+        text-align: left;
+        border-bottom: 1px solid #E5E7EB;
+    }
+    
+    .attendance-table th {
+        background: #F8FAFC;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="course-header">
+    <div style="display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <h1 style="font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem;">{{ course.title }}</h1>
+            <p style="font-size: 1rem; opacity: 0.9; margin-bottom: 0.5rem;">{{ course.description }}</p>
+            <p style="font-size: 0.9rem; opacity: 0.8;">
+                <i class="fas fa-user-tie"></i> Instructor: {{ course.teacher_name }}
+            </p>
+        </div>
+        
+        {% if current_user.role == 'student' %}
+        <div style="display: flex; gap: 0.5rem;">
+            <span style="background: rgba(255,255,255,0.2); padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.9rem;">
+                <i class="fas fa-user-graduate"></i> Student
+            </span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="section-tabs">
+    <button class="tab-btn active" onclick="showTab('materials')">
+        <i class="fas fa-folder"></i> Materials
+    </button>
+    <button class="tab-btn" onclick="showTab('ai-assistant')">
+        <i class="fas fa-robot"></i> AI Assistant
+    </button>
+    <button class="tab-btn" onclick="showTab('forum')">
+        <i class="fas fa-comments"></i> Forum
+    </button>
+    {% if current_user.role == 'teacher' %}
+    <button class="tab-btn" onclick="showTab('attendance')">
+        <i class="fas fa-calendar-check"></i> Attendance
+    </button>
+    {% endif %}
+</div>
+
+<!-- Materials Tab -->
+<div id="materials" class="tab-content active">
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <h3><i class="fas fa-folder"></i> Course Materials</h3>
+            {% if current_user.role == 'teacher' %}
+            <button onclick="showUploadModal()" class="btn btn-secondary">
+                <i class="fas fa-upload"></i> Upload Material
+            </button>
+            {% endif %}
+        </div>
+        
+        {% if materials %}
+            {% for material in materials %}
+            <div class="material-item">
+                <div class="material-info">
+                    <i class="fas fa-file-pdf" style="color: #EF4444; font-size: 1.5rem;"></i>
+                    <div>
+                        <h4 style="color: #374151; font-weight: 600;">{{ material.title }}</h4>
+                        <p style="color: #6B7280; font-size: 0.9rem;">
+                            Uploaded {{ material.uploaded_at.split(' ')[0] if material.uploaded_at else 'Recently' }}
+                        </p>
+                    </div>
+                </div>
+                <div class="material-actions">
+                    <a href="{{ url_for('download_material', material_id=material.id) }}" class="btn btn-outline" style="padding: 0.5rem 1rem;">
+                        <i class="fas fa-download"></i> Download
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div style="text-align: center; padding: 3rem; color: #6B7280;">
+                <i class="fas fa-folder-open" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.3;"></i>
+                <h4>No materials uploaded yet</h4>
+                {% if current_user.role == 'teacher' %}
+                <p style="margin: 1rem 0;">Upload your first course material to get started.</p>
+                <button onclick="showUploadModal()" class="btn btn-primary">
+                    <i class="fas fa-upload"></i> Upload Material
+                </button>
+                {% else %}
+                <p>Your instructor hasn't uploaded any materials yet.</p>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- AI Assistant Tab -->
+<div id="ai-assistant" class="tab-content">
+    <div class="card">
+        <h3 style="margin-bottom: 1rem;"><i class="fas fa-robot"></i> AI Learning Assistant</h3>
+        <p style="color: #6B7280; margin-bottom: 1.5rem;">
+            Ask any question about this course and get instant help from our AI assistant.
+        </p>
+        
+        <div class="chat-container">
+            <div class="chat-messages" id="chatMessages">
+                <div class="message ai">
+                    <strong>AI Assistant:</strong> Hello! I'm here to help you with any questions about {{ course.title }}. Feel free to ask me anything!
+                </div>
+            </div>
+            <div class="chat-input">
+                <input type="text" id="chatInput" placeholder="Ask a question about the course..." style="flex: 1; padding: 0.75rem; border: 1px solid #D1D5DB; border-radius: 8px;">
+                <button onclick="sendMessage()" class="btn btn-primary">
+                    <i class="fas fa-paper-plane"></i> Send
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Forum Tab -->
+<div id="forum" class="tab-content">
+    <div class="card">
+        <h3 style="margin-bottom: 1rem;"><i class="fas fa-comments"></i> Course Discussion Forum</h3>
+        
+        <form action="{{ url_for('post_question', course_id=course.id) }}" method="POST" style="margin-bottom: 2rem;">
+            <div class="form-group">
+                <label for="content">Ask a question or start a discussion:</label>
+                <textarea name="content" id="content" rows="3" placeholder="What would you like to discuss about this course?" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Post Question
+            </button>
+        </form>
+        
+        {% if posts %}
+            {% for post in posts %}
+            <div class="forum-post">
+                <div class="post-header">
+                    <div>
+                        <strong>{{ post.username }}</strong>
+                        <span style="color: #6B7280; font-size: 0.9rem; margin-left: 0.5rem;">
+                            {{ post.timestamp.split('.')[0] if '.' in post.timestamp else post.timestamp }}
+                        </span>
+                    </div>
+                    <span style="background: #DBEAFE; color: #1E40AF; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem;">
+                        <i class="fas fa-reply"></i> {{ post.reply_count }} replies
+                    </span>
+                </div>
+                <p style="color: #374151; line-height: 1.6;">{{ post.content }}</p>
+                
+                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #E5E7EB;">
+                    <form action="{{ url_for('post_reply', post_id=post.id) }}" method="POST" style="display: flex; gap: 0.5rem;">
+                        <input type="hidden" name="course_id" value="{{ course.id }}">
+                        <input type="text" name="content" placeholder="Write a reply..." style="flex: 1; padding: 0.5rem; border: 1px solid #D1D5DB; border-radius: 8px;" required>
+                        <button type="submit" class="btn btn-outline" style="padding: 0.5rem 1rem;">
+                            <i class="fas fa-reply"></i> Reply
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div style="text-align: center; padding: 3rem; color: #6B7280;">
+                <i class="fas fa-comments" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.3;"></i>
+                <h4>No discussions yet</h4>
+                <p>Be the first to start a discussion about this course!</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Attendance Tab (Teachers only) -->
+{% if current_user.role == 'teacher' %}
+<div id="attendance" class="tab-content">
+    <div class="card">
+        <h3 style="margin-bottom: 1rem;"><i class="fas fa-calendar-check"></i> Take Attendance</h3>
+        
+        <form id="attendanceForm" style="margin-bottom: 2rem;">
+            <div class="form-group">
+                <label for="attendanceDate">Date:</label>
+                <input type="date" id="attendanceDate" name="date" required style="max-width: 200px;" value="{{ today }}">
+            </div>
+            
+            {% if students %}
+            <h4 style="margin-bottom: 1rem;">Mark Present Students:</h4>
+            <table class="attendance-table">
+                <thead>
+                    <tr>
+                        <th>Present</th>
+                        <th>Student Name</th>
+                        <th>Username</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student in students %}
+                    <tr>
+                        <td>
+                            <input type="checkbox" name="students" value="{{ student.id }}" style="transform: scale(1.2);">
+                        </td>
+                        <td>{{ student.username }}</td>
+                        <td>@{{ student.username }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            
+            <div style="margin-top: 1.5rem;">
+                <button type="button" onclick="takeAttendance()" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Record Attendance
+                </button>
+                <button type="button" onclick="selectAll()" class="btn btn-outline">
+                    <i class="fas fa-check-double"></i> Select All
+                </button>
+                <button type="button" onclick="selectNone()" class="btn btn-outline">
+                    <i class="fas fa-times"></i> Clear All
+                </button>
+            </div>
+            {% else %}
+                <div style="text-align: center; padding: 2rem; color: #6B7280;">
+                    <i class="fas fa-users" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.3;"></i>
+                    <h4>No students enrolled</h4>
+                    <p>Students need to enroll in this course before you can take attendance.</p>
+                </div>
+            {% endif %}
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<!-- Upload Modal -->
+{% if current_user.role == 'teacher' %}
+<div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: white; padding: 2rem; border-radius: 16px; width: 90%; max-width: 500px;">
+        <h3 style="margin-bottom: 1.5rem;">Upload Course Material</h3>
+        
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="title">Material Title</label>
+                <input type="text" id="materialTitle" name="title" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="file">Select File</label>
+                <input type="file" id="materialFile" name="file" accept=".pdf,.doc,.docx,.txt,.ppt,.pptx" required>
+            </div>
+            
+            <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                <button type="button" onclick="hideUploadModal()" class="btn btn-outline">Cancel</button>
+                <button type="button" onclick="uploadMaterial()" class="btn btn-primary">
+                    <i class="fas fa-upload"></i> Upload
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showTab(tabName) {
+    // Hide all tab contents
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
+    // Remove active class from all tab buttons
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Show selected tab
+    document.getElementById(tabName).classList.add('active');
+    
+    // Add active class to clicked button
+    event.target.classList.add('active');
+}
+
+async function sendMessage() {
+    const input = document.getElementById('chatInput');
+    const message = input.value.trim();
+    
+    if (!message) return;
+    
+    // Add user message to chat
+    const chatMessages = document.getElementById('chatMessages');
+    chatMessages.innerHTML += `
+        <div class="message user">
+            <strong>You:</strong> ${message}
+        </div>
+    `;
+    
+    // Clear input
+    input.value = '';
+    
+    // Add loading message
+    chatMessages.innerHTML += `
+        <div class="message ai" id="loadingMessage">
+            <strong>AI Assistant:</strong> <i class="fas fa-spinner fa-spin"></i> Thinking...
+        </div>
+    `;
+    
+    // Scroll to bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    
+    try {
+        const response = await fetch('/api/ask', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                question: message,
+                course_id: {{ course.id }}
+            })
+        });
+        
+        const data = await response.json();
+        
+        // Remove loading message
+        document.getElementById('loadingMessage').remove();
+        
+        // Add AI response
+        chatMessages.innerHTML += `
+            <div class="message ai">
+                <strong>AI Assistant:</strong> ${data.response}
+            </div>
+        `;
+        
+    } catch (error) {
+        // Remove loading message
+        document.getElementById('loadingMessage').remove();
+        
+        // Add error message
+        chatMessages.innerHTML += `
+            <div class="message ai">
+                <strong>AI Assistant:</strong> Sorry, I'm having trouble right now. Please try again later.
+            </div>
+        `;
+    }
+    
+    // Scroll to bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Allow Enter key to send message
+document.getElementById('chatInput')?.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        sendMessage();
+    }
+});
+
+{% if current_user.role == 'teacher' %}
+function showUploadModal() {
+    document.getElementById('uploadModal').style.display = 'flex';
+}
+
+function hideUploadModal() {
+    document.getElementById('uploadModal').style.display = 'none';
+}
+
+async function uploadMaterial() {
+    const form = document.getElementById('uploadForm');
+    const formData = new FormData();
+    
+    formData.append('title', document.getElementById('materialTitle').value);
+    formData.append('file', document.getElementById('materialFile').files[0]);
+    
+    try {
+        const response = await fetch('/upload_material/{{ course.id }}', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Material uploaded successfully!');
+            location.reload();
+        } else {
+            alert('Upload failed: ' + data.error);
+        }
+    } catch (error) {
+        alert('Upload failed. Please try again.');
+    }
+}
+
+async function takeAttendance() {
+    const form = document.getElementById('attendanceForm');
+    const formData = new FormData(form);
+    
+    try {
+        const response = await fetch('/take_attendance/{{ course.id }}', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Attendance recorded successfully!');
+        } else {
+            alert('Failed to record attendance: ' + data.error);
+        }
+    } catch (error) {
+        alert('Failed to record attendance. Please try again.');
+    }
+}
+
+function selectAll() {
+    document.querySelectorAll('input[name="students"]').forEach(checkbox => {
+        checkbox.checked = true;
+    });
+}
+
+function selectNone() {
+    document.querySelectorAll('input[name="students"]').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+}
+
+// Set today's date as default
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date().toISOString().split('T')[0];
+    const dateInput = document.getElementById('attendanceDate');
+    if (dateInput) {
+        dateInput.value = today;
+    }
+});
+{% endif %}
+</script>
+{% endblock %}

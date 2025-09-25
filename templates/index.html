@@ -1,0 +1,131 @@
+{% extends "layout.html" %}
+
+{% block title %}Welcome to Rajasthan Digi-Shala - Broker-Free Education{% endblock %}
+
+{% block content %}
+<div class="hero-section" style="text-align: center; padding: 4rem 0;">
+    <div style="max-width: 800px; margin: 0 auto;">
+        <h1 style="font-size: 3.5rem; font-weight: 700; color: #4F46E5; margin-bottom: 1.5rem; line-height: 1.2;">
+            राजस्थान डिजी-शाला
+        </h1>
+        <h2 style="font-size: 1.8rem; color: #6B7280; margin-bottom: 2rem; font-weight: 400;">
+            Broker-Free Digital Education Platform
+        </h2>
+        <p style="font-size: 1.2rem; color: #4B5563; margin-bottom: 3rem; line-height: 1.8;">
+            Empowering students and teachers across Rajasthan with direct access to quality education,
+            cutting out middlemen and making learning accessible to all.
+        </p>
+        
+        {% if not current_user.is_authenticated %}
+        <div style="display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap;">
+            <a href="{{ url_for('register') }}" class="btn btn-primary" style="font-size: 1.1rem; padding: 1rem 2rem;">
+                <i class="fas fa-user-plus"></i> Get Started Today
+            </a>
+            <a href="{{ url_for('login') }}" class="btn btn-outline" style="font-size: 1.1rem; padding: 1rem 2rem;">
+                <i class="fas fa-sign-in-alt"></i> Sign In
+            </a>
+        </div>
+        {% else %}
+        <div style="display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap;">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary" style="font-size: 1.1rem; padding: 1rem 2rem;">
+                <i class="fas fa-tachometer-alt"></i> Go to Dashboard
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="features-section" style="padding: 4rem 0;">
+    <h2 style="text-align: center; font-size: 2.5rem; font-weight: 600; color: #374151; margin-bottom: 3rem;">
+        Why Choose Digi-Shala?
+    </h2>
+    
+    <div class="grid grid-3">
+        <div class="card" style="text-align: center;">
+            <div style="background: linear-gradient(135deg, #4F46E5, #7C3AED); width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 1.5rem; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-users" style="color: white; font-size: 2rem;"></i>
+            </div>
+            <h3 style="font-size: 1.4rem; font-weight: 600; color: #374151; margin-bottom: 1rem;">
+                Direct Connection
+            </h3>
+            <p style="color: #6B7280; line-height: 1.6;">
+                Connect directly with qualified teachers without any middlemen or brokers. Pure, authentic education.
+            </p>
+        </div>
+        
+        <div class="card" style="text-align: center;">
+            <div style="background: linear-gradient(135deg, #F59E0B, #D97706); width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 1.5rem; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-wifi" style="color: white; font-size: 2rem;"></i>
+            </div>
+            <h3 style="font-size: 1.4rem; font-weight: 600; color: #374151; margin-bottom: 1rem;">
+                Online & Offline Access
+            </h3>
+            <p style="color: #6B7280; line-height: 1.6;">
+                Download materials and access them offline. No internet? No problem. Learning never stops.
+            </p>
+        </div>
+        
+        <div class="card" style="text-align: center;">
+            <div style="background: linear-gradient(135deg, #10B981, #059669); width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 1.5rem; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-robot" style="color: white; font-size: 2rem;"></i>
+            </div>
+            <h3 style="font-size: 1.4rem; font-weight: 600; color: #374151; margin-bottom: 1rem;">
+                AI Learning Assistant
+            </h3>
+            <p style="color: #6B7280; line-height: 1.6;">
+                Get instant answers to your questions with our AI-powered learning assistant, available 24/7.
+            </p>
+        </div>
+        
+        <div class="card" style="text-align: center;">
+            <div style="background: linear-gradient(135deg, #EC4899, #DB2777); width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 1.5rem; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-chart-line" style="color: white; font-size: 2rem;"></i>
+            </div>
+            <h3 style="font-size: 1.4rem; font-weight: 600; color: #374151; margin-bottom: 1rem;">
+                Performance Tracking
+            </h3>
+            <p style="color: #6B7280; line-height: 1.6;">
+                Monitor your learning progress with detailed analytics and attendance tracking.
+            </p>
+        </div>
+        
+        <div class="card" style="text-align: center;">
+            <div style="background: linear-gradient(135deg, #8B5CF6, #7C3AED); width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 1.5rem; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-comments" style="color: white; font-size: 2rem;"></i>
+            </div>
+            <h3 style="font-size: 1.4rem; font-weight: 600; color: #374151; margin-bottom: 1rem;">
+                Community Learning
+            </h3>
+            <p style="color: #6B7280; line-height: 1.6;">
+                Join course discussions, ask questions, and learn from your peers in our vibrant community.
+            </p>
+        </div>
+        
+        <div class="card" style="text-align: center;">
+            <div style="background: linear-gradient(135deg, #06B6D4, #0891B2); width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 1.5rem; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-mobile-alt" style="color: white; font-size: 2rem;"></i>
+            </div>
+            <h3 style="font-size: 1.4rem; font-weight: 600; color: #374151; margin-bottom: 1rem;">
+                Mobile Friendly
+            </h3>
+            <p style="color: #6B7280; line-height: 1.6;">
+                Access your education on any device, anywhere. Responsive design for seamless learning.
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="cta-section" style="background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: white; padding: 4rem 2rem; border-radius: 20px; text-align: center; margin: 4rem 0;">
+    <h2 style="font-size: 2.5rem; font-weight: 700; margin-bottom: 1.5rem;">
+        Ready to Start Your Learning Journey?
+    </h2>
+    <p style="font-size: 1.2rem; margin-bottom: 2.5rem; opacity: 0.9;">
+        Join thousands of students and teachers already using Rajasthan Digi-Shala
+    </p>
+    {% if not current_user.is_authenticated %}
+    <a href="{{ url_for('register') }}" class="btn" style="background: #F59E0B; color: white; font-size: 1.1rem; padding: 1rem 2rem;">
+        <i class="fas fa-rocket"></i> Join Digi-Shala Now
+    </a>
+    {% endif %}
+</div>
+{% endblock %}
