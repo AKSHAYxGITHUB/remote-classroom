@@ -1,68 +1,86 @@
-import sqlite3
-from datetime import datetime
+import os
+import psycopg2
+from psycopg2.extras import DictCursor
 
-DATABASE = 'rajasthan_digi_shala.db'
+# Get the database connection URL from the environment variables
+DATABASE_URL = os.environ.get('DATABASE_URL')
 
 def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+    """
+    Establishes a connection to the PostgreSQL database.
+    The connection string is retrieved from the DATABASE_URL environment
+    variable, which is the standard practice for services like Render.
+    """
+    try:
+        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+        # Use DictCursor to get rows as dictionaries (like sqlite3.Row)
+        conn.cursor_factory = DictCursor
+        return conn
+    except psycopg2.OperationalError as e:
+        # A more descriptive error message for connection issues
+        raise Exception(f"Error connecting to the database: {e}")
 
 def init_db():
+    """
+    Initializes the database schema.
+    This function creates all the necessary tables if they don't already exist.
+    It's safe to run this multiple times.
+    """
     conn = get_db_connection()
-    
+    cur = conn.cursor()
+
     # Users table
-    conn.execute('''
+    cur.execute('''
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             role TEXT NOT NULL CHECK (role IN ('student', 'teacher')),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
+        );
     ''')
-    
+
     # Courses table
-    conn.execute('''
+    cur.execute('''
         CREATE TABLE IF NOT EXISTS courses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             title TEXT NOT NULL,
             description TEXT,
             teacher_id INTEGER NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (teacher_id) REFERENCES users (id)
-        )
+        );
     ''')
-    
-    # Enrollment table (many-to-many relationship between students and courses)
-    conn.execute('''
+
+    # Enrollment table
+    cur.execute('''
         CREATE TABLE IF NOT EXISTS enrollment (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             user_id INTEGER NOT NULL,
             course_id INTEGER NOT NULL,
             enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id),
             FOREIGN KEY (course_id) REFERENCES courses (id),
             UNIQUE(user_id, course_id)
-        )
+        );
     ''')
-    
+
     # Materials table
-    conn.execute('''
+    cur.execute('''
         CREATE TABLE IF NOT EXISTS materials (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             course_id INTEGER NOT NULL,
             title TEXT NOT NULL,
             filepath TEXT NOT NULL,
             uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (course_id) REFERENCES courses (id)
-        )
+        );
     ''')
-    
+
     # Attendance table
-    conn.execute('''
+    cur.execute('''
         CREATE TABLE IF NOT EXISTS attendance (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             student_id INTEGER NOT NULL,
             course_id INTEGER NOT NULL,
             date DATE NOT NULL,
@@ -71,76 +89,44 @@ def init_db():
             FOREIGN KEY (student_id) REFERENCES users (id),
             FOREIGN KEY (course_id) REFERENCES courses (id),
             UNIQUE(student_id, course_id, date)
-        )
+        );
     ''')
-    
+
     # Posts table (for forum)
-    conn.execute('''
+    cur.execute('''
         CREATE TABLE IF NOT EXISTS posts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             course_id INTEGER NOT NULL,
             user_id INTEGER NOT NULL,
             content TEXT NOT NULL,
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (course_id) REFERENCES courses (id),
             FOREIGN KEY (user_id) REFERENCES users (id)
-        )
+        );
     ''')
-    
+
     # Replies table (for forum)
-    conn.execute('''
+    cur.execute('''
         CREATE TABLE IF NOT EXISTS replies (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             post_id INTEGER NOT NULL,
             user_id INTEGER NOT NULL,
             content TEXT NOT NULL,
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (post_id) REFERENCES posts (id),
             FOREIGN KEY (user_id) REFERENCES users (id)
-        )
+        );
     ''')
-    
-    conn.commit()
-    
-    # Insert sample data if tables are empty
-    cursor = conn.cursor()
-    cursor.execute('SELECT COUNT(*) FROM users')
-    if cursor.fetchone()[0] == 0:
-        insert_sample_data(conn)
-    
-    conn.close()
 
-def insert_sample_data(conn):
-    from werkzeug.security import generate_password_hash
-    
-    # Sample users
-    users = [
-        ('teacher1', generate_password_hash('password123'), 'teacher'),
-        ('student1', generate_password_hash('password123'), 'student'),
-        ('student2', generate_password_hash('password123'), 'student'),
-    ]
-    
-    conn.executemany('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)', users)
-    
-    # Sample courses
-    courses = [
-        ('Hindi Literature', 'Comprehensive course on Hindi literature and poetry', 1),
-        ('Mathematics Basics', 'Fundamental mathematics concepts for beginners', 1),
-        ('Rajasthani Culture', 'Exploring the rich culture and traditions of Rajasthan', 1),
-    ]
-    
-    conn.executemany('INSERT INTO courses (title, description, teacher_id) VALUES (?, ?, ?)', courses)
-    
-    # Sample enrollments
-    enrollments = [
-        (2, 1), (2, 2), (2, 3),  # student1 enrolled in all courses
-        (3, 1), (3, 2),           # student2 enrolled in courses 1 and 2
-    ]
-    
-    conn.executemany('INSERT INTO enrollment (user_id, course_id) VALUES (?, ?)', enrollments)
-    
     conn.commit()
+    cur.close()
+    conn.close()
+    print("Database schema initialized.")
 
 if __name__ == '__main__':
-    init_db()
-    print("Database initialized successfully!")
+    # This allows you to run `python database.py` to set up the schema
+    # after you've set the DATABASE_URL environment variable.
+    if not DATABASE_URL:
+        print("Error: DATABASE_URL environment variable not set.")
+    else:
+        init_db()
