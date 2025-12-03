@@ -27,7 +27,7 @@ def get_db_connection():
         raise Exception("MONGODB_URL or DATABASE_URL environment variable not set")
     
     try:
-        # Connection options for MongoDB Atlas with maximum compatibility
+        # Connection options for MongoDB Atlas - PyMongo compatible
         client = MongoClient(
             MONGODB_URL,
             serverSelectionTimeoutMS=20000,
@@ -37,7 +37,6 @@ def get_db_connection():
             tls=True,
             tlsAllowInvalidCertificates=True,
             tlsInsecure=True,
-            ssl_cert_reqs='CERT_NONE',
             maxPoolSize=50,
             minPoolSize=10
         )
