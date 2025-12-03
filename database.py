@@ -27,21 +27,31 @@ def get_db_connection():
         raise Exception("MONGODB_URL or DATABASE_URL environment variable not set")
     
     try:
-        # Add SSL/TLS options for MongoDB Atlas
+        # Connection options for MongoDB Atlas with maximum compatibility
         client = MongoClient(
             MONGODB_URL,
-            serverSelectionTimeoutMS=10000,
-            connectTimeoutMS=10000,
-            socketTimeoutMS=10000,
+            serverSelectionTimeoutMS=20000,
+            connectTimeoutMS=20000,
+            socketTimeoutMS=20000,
             retryWrites=True,
             tls=True,
-            tlsAllowInvalidCertificates=True  # For development/testing
+            tlsAllowInvalidCertificates=True,
+            tlsInsecure=True,
+            ssl_cert_reqs='CERT_NONE',
+            maxPoolSize=50,
+            minPoolSize=10
         )
-        # Verify connection
-        client.admin.command('ping')
+        # Verify connection with ping
+        client.admin.command('ping', timeoutMS=20000)
         _db = client['remote_classroom']
+        print("✓ MongoDB connection successful")
         return _db
     except (ConnectionFailure, ServerSelectionTimeoutError) as e:
+        print(f"✗ MongoDB connection failed: {e}")
+        print("Checking MongoDB Atlas configuration...")
+        print("1. Verify IP whitelist includes Render.com IPs (0.0.0.0/0 for testing)")
+        print("2. Check username and password are URL-encoded in connection string")
+        print("3. Ensure database name 'remote_classroom' exists")
         raise Exception(f"Error connecting to MongoDB: {e}")
 
 def init_db():
