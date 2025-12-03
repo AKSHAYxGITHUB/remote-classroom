@@ -109,6 +109,13 @@ def dashboard():
         courses = get_student_courses(current_user.id)
         available_courses = get_available_courses(current_user.id)
 
+    # Add id field for template compatibility with MongoDB _id
+    for course in courses:
+        course['id'] = str(course['_id'])
+    
+    for course in available_courses:
+        course['id'] = str(course['_id'])
+
     return render_template('dashboard.html', courses=courses, available_courses=available_courses)
 
 @app.route('/create_course', methods=['POST'])
@@ -154,6 +161,16 @@ def course(course_id):
         # Add teacher name
         teacher = get_user_by_id(str(course_data['teacher_id']))
         course_data['teacher_name'] = teacher['username'] if teacher else 'Unknown'
+        
+        # Add id field for template compatibility with MongoDB _id
+        course_data['id'] = str(course_data['_id'])
+        
+        # Add id field to materials and posts for template compatibility
+        for material in materials:
+            material['id'] = str(material['_id'])
+        
+        for post in posts:
+            post['id'] = str(post['_id'])
         
         return render_template('course.html', course=course_data, materials=materials, posts=posts, students=students)
     except Exception as e:
