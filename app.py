@@ -20,6 +20,13 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
+# Initialize database on app startup
+try:
+    init_db()
+    print("Database initialized successfully")
+except Exception as e:
+    print(f"Warning: Could not initialize database on startup: {e}")
+
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -32,9 +39,12 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
-    user_doc = get_user_by_id(user_id)
-    if user_doc:
-        return User(str(user_doc['_id']), user_doc['username'], user_doc['role'])
+    try:
+        user_doc = get_user_by_id(user_id)
+        if user_doc:
+            return User(str(user_doc['_id']), user_doc['username'], user_doc['role'])
+    except Exception as e:
+        print(f"Error loading user: {e}")
     return None
 
 @app.route('/')
@@ -61,20 +71,25 @@ def login():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        role = request.form['role']
+        try:
+            username = request.form['username']
+            password = request.form['password']
+            role = request.form['role']
 
-        existing_user = get_user_by_username(username)
-        if existing_user:
-            flash('Username already exists')
+            existing_user = get_user_by_username(username)
+            if existing_user:
+                flash('Username already exists')
+                return render_template('register.html')
+
+            password_hash = generate_password_hash(password)
+            create_user(username, password_hash, role)
+
+            flash('Registration successful! Please login.')
+            return redirect(url_for('login'))
+        except Exception as e:
+            print(f"Registration error: {e}")
+            flash(f'Registration failed: {str(e)}')
             return render_template('register.html')
-
-        password_hash = generate_password_hash(password)
-        create_user(username, password_hash, role)
-
-        flash('Registration successful! Please login.')
-        return redirect(url_for('login'))
 
     return render_template('register.html')
 
@@ -260,6 +275,22 @@ def post_reply(post_id):
 @app.route('/mission')
 def mission():
     return render_template('mission.html')
+
+@app.errorhandler(500)
+def internal_error(error):
+    print(f"500 Error: {error}")
+    return jsonify({'error': 'Internal Server Error', 'message': str(error)}), 500
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Not Found', 'message': str(error)}), 404
+
+@app.errorhandler(Exception)
+def handle_exception(error):
+    print(f"Unhandled Exception: {error}")
+    import traceback
+    traceback.print_exc()
+    return jsonify({'error': 'An error occurred', 'message': str(error)}), 500
 
 @app.route('/manifest.json')
 def manifest():

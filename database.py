@@ -7,6 +7,16 @@ from datetime import datetime
 # Global MongoDB connection
 _db = None
 
+def to_object_id(value):
+    """Convert string to ObjectId safely"""
+    try:
+        if isinstance(value, str):
+            return ObjectId(value)
+        return value
+    except Exception as e:
+        print(f"Error converting to ObjectId: {e}")
+        return value
+
 def get_db_connection():
     """Get MongoDB database connection"""
     global _db
@@ -73,8 +83,15 @@ def create_user(username, password_hash, role):
 
 def get_user_by_id(user_id):
     """Get user by ID"""
-    db = get_db_connection()
-    return db['users'].find_one({'_id': ObjectId(user_id)})
+    try:
+        db = get_db_connection()
+        # Ensure user_id is a valid ObjectId
+        if isinstance(user_id, str):
+            user_id = ObjectId(user_id)
+        return db['users'].find_one({'_id': user_id})
+    except Exception as e:
+        print(f"Error getting user by ID: {e}")
+        return None
 
 def get_user_by_username(username):
     """Get user by username"""
@@ -83,26 +100,39 @@ def get_user_by_username(username):
 
 def create_course(title, description, teacher_id):
     """Create a new course"""
-    db = get_db_connection()
-    course = {
-        'title': title,
-        'description': description,
-        'teacher_id': ObjectId(teacher_id),
-        'created_at': datetime.now()
-    }
-    result = db['courses'].insert_one(course)
-    return result.inserted_id
+    try:
+        db = get_db_connection()
+        # Ensure teacher_id is a valid ObjectId
+        if isinstance(teacher_id, str):
+            teacher_id = ObjectId(teacher_id)
+        course = {
+            'title': title,
+            'description': description,
+            'teacher_id': teacher_id,
+            'created_at': datetime.now()
+        }
+        result = db['courses'].insert_one(course)
+        return result.inserted_id
+    except Exception as e:
+        print(f"Error creating course: {e}")
+        raise
 
 def get_course(course_id):
     """Get course by ID"""
-    db = get_db_connection()
-    return db['courses'].find_one({'_id': ObjectId(course_id)})
+    try:
+        db = get_db_connection()
+        if isinstance(course_id, str):
+            course_id = ObjectId(course_id)
+        return db['courses'].find_one({'_id': course_id})
+    except Exception as e:
+        print(f"Error getting course: {e}")
+        return None
 
 def get_teacher_courses(teacher_id):
     """Get all courses for a teacher"""
     db = get_db_connection()
     return list(db['courses'].aggregate([
-        {'$match': {'teacher_id': ObjectId(teacher_id)}},
+        {'$match': {'teacher_id': to_object_id(teacher_id)}},
         {'$lookup': {
             'from': 'enrollment',
             'localField': '_id',
@@ -123,7 +153,7 @@ def get_student_courses(student_id):
             'foreignField': 'course_id',
             'as': 'enrollments'
         }},
-        {'$match': {'enrollments.user_id': ObjectId(student_id)}},
+        {'$match': {'enrollments.user_id': to_object_id(student_id)}},
         {'$lookup': {
             'from': 'users',
             'localField': 'teacher_id',
@@ -152,7 +182,7 @@ def get_available_courses(student_id):
             'let': {'course_id': '$_id'},
             'pipeline': [
                 {'$match': {
-                    'user_id': ObjectId(student_id),
+                    'user_id': to_object_id(student_id),
                     'course_id': '$$course_id'
                 }}
             ],
@@ -173,8 +203,8 @@ def enroll_student(user_id, course_id):
     """Enroll student in course"""
     db = get_db_connection()
     enrollment = {
-        'user_id': ObjectId(user_id),
-        'course_id': ObjectId(course_id),
+        'user_id': to_object_id(user_id),
+        'course_id': to_object_id(course_id),
         'enrolled_at': datetime.now()
     }
     db['enrollment'].insert_one(enrollment)
@@ -182,18 +212,18 @@ def enroll_student(user_id, course_id):
 def is_enrolled(user_id, course_id):
     """Check if student is enrolled in course"""
     db = get_db_connection()
-    return db['enrollment'].find_one({'user_id': ObjectId(user_id), 'course_id': ObjectId(course_id)}) is not None
+    return db['enrollment'].find_one({'user_id': to_object_id(user_id), 'course_id': to_object_id(course_id)}) is not None
 
 def get_course_materials(course_id):
     """Get all materials for a course"""
     db = get_db_connection()
-    return list(db['materials'].find({'course_id': ObjectId(course_id)}))
+    return list(db['materials'].find({'course_id': to_object_id(course_id)}))
 
 def add_material(course_id, title, filepath):
     """Add material to course"""
     db = get_db_connection()
     material = {
-        'course_id': ObjectId(course_id),
+        'course_id': to_object_id(course_id),
         'title': title,
         'filepath': filepath,
         'uploaded_at': datetime.now()
@@ -204,13 +234,13 @@ def add_material(course_id, title, filepath):
 def get_material(material_id):
     """Get material by ID"""
     db = get_db_connection()
-    return db['materials'].find_one({'_id': ObjectId(material_id)})
+    return db['materials'].find_one({'_id': to_object_id(material_id)})
 
 def get_course_posts(course_id):
     """Get all posts for a course"""
     db = get_db_connection()
     return list(db['posts'].aggregate([
-        {'$match': {'course_id': ObjectId(course_id)}},
+        {'$match': {'course_id': to_object_id(course_id)}},
         {'$lookup': {
             'from': 'users',
             'localField': 'user_id',
@@ -235,8 +265,8 @@ def create_post(course_id, user_id, content):
     """Create a new post"""
     db = get_db_connection()
     post = {
-        'course_id': ObjectId(course_id),
-        'user_id': ObjectId(user_id),
+        'course_id': to_object_id(course_id),
+        'user_id': to_object_id(user_id),
         'content': content,
         'timestamp': datetime.now()
     }
@@ -247,8 +277,8 @@ def create_reply(post_id, user_id, content):
     """Create a reply to a post"""
     db = get_db_connection()
     reply = {
-        'post_id': ObjectId(post_id),
-        'user_id': ObjectId(user_id),
+        'post_id': to_object_id(post_id),
+        'user_id': to_object_id(user_id),
         'content': content,
         'timestamp': datetime.now()
     }
@@ -259,14 +289,14 @@ def record_attendance(student_id, course_id, date, status):
     """Record attendance"""
     db = get_db_connection()
     attendance = {
-        'student_id': ObjectId(student_id),
-        'course_id': ObjectId(course_id),
+        'student_id': to_object_id(student_id),
+        'course_id': to_object_id(course_id),
         'date': date,
         'status': status,
         'recorded_at': datetime.now()
     }
     db['attendance'].update_one(
-        {'student_id': ObjectId(student_id), 'course_id': ObjectId(course_id), 'date': date},
+        {'student_id': to_object_id(student_id), 'course_id': to_object_id(course_id), 'date': date},
         {'$set': attendance},
         upsert=True
     )
@@ -283,7 +313,7 @@ def get_course_students(course_id):
         }},
         {'$match': {
             'role': 'student',
-            'enrollments.course_id': ObjectId(course_id)
+            'enrollments.course_id': to_object_id(course_id)
         }},
         {'$project': {'enrollments': 0}}
     ]))
@@ -291,7 +321,7 @@ def get_course_students(course_id):
 def delete_attendance_for_date(course_id, date):
     """Delete all attendance records for a course on a specific date"""
     db = get_db_connection()
-    db['attendance'].delete_many({'course_id': ObjectId(course_id), 'date': date})
+    db['attendance'].delete_many({'course_id': to_object_id(course_id), 'date': date})
 
 if __name__ == '__main__':
     init_db()
