@@ -172,6 +172,10 @@ def course(course_id):
         for post in posts:
             post['id'] = str(post['_id'])
         
+        # Add id field to students for template compatibility
+        for student in students:
+            student['id'] = str(student['_id'])
+        
         return render_template('course.html', course=course_data, materials=materials, posts=posts, students=students)
     except Exception as e:
         flash(f'Error loading course: {str(e)}')

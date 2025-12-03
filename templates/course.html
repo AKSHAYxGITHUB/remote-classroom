@@ -408,25 +408,49 @@
 {% block extra_js %}
 <script>
 function showTab(tabName) {
+    console.log('showTab called with:', tabName);
+    
     // Hide all tab contents
-    document.querySelectorAll('.tab-content').forEach(tab => {
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabContents.forEach(tab => {
         tab.classList.remove('active');
     });
     
     // Remove active class from all tab buttons
-    document.querySelectorAll('.tab-btn').forEach(btn => {
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    tabButtons.forEach(btn => {
         btn.classList.remove('active');
     });
     
     // Show selected tab
     const tabContent = document.getElementById(tabName);
     if (tabContent) {
+        console.log('Setting tab active:', tabName);
         tabContent.classList.add('active');
+    } else {
+        console.log('Tab not found:', tabName);
     }
     
-    // Add active class to clicked button
+    // Find and activate the clicked button
     if (event && event.target) {
-        event.target.classList.add('active');
+        let btn = event.target;
+        console.log('Event target:', btn.tagName);
+        
+        // If the click was on the icon, get the parent button
+        if (btn.tagName === 'I') {
+            btn = btn.closest('.tab-btn');
+            console.log('Found parent button via closest');
+        }
+        
+        // If we still don't have a button (clicked on text), find it
+        if (btn && btn.tagName !== 'BUTTON') {
+            btn = btn.closest('.tab-btn');
+        }
+        
+        if (btn && btn.classList) {
+            console.log('Adding active class to button');
+            btn.classList.add('active');
+        }
     }
 }
 
@@ -506,11 +530,15 @@ document.getElementById('chatInput')?.addEventListener('keypress', function(e) {
 
 {% if current_user.role == 'teacher' %}
 function showUploadModal() {
-    document.getElementById('uploadModal').style.display = 'flex';
+    const modal = document.getElementById('uploadModal');
+    modal.style.display = 'flex';
+    console.log('Upload modal shown');
 }
 
 function hideUploadModal() {
-    document.getElementById('uploadModal').style.display = 'none';
+    const modal = document.getElementById('uploadModal');
+    modal.style.display = 'none';
+    console.log('Upload modal hidden');
 }
 
 // Close modal when clicking outside
@@ -581,13 +609,49 @@ function selectNone() {
     });
 }
 
-// Set today's date as default
+// Set today's date as default and initialize event listeners
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('Page loaded - initializing...');
+    
+    // Set attendance date
     const today = new Date().toISOString().split('T')[0];
     const dateInput = document.getElementById('attendanceDate');
     if (dateInput) {
         dateInput.value = today;
+        console.log('Attendance date set to:', today);
     }
+    
+    // Initialize tab buttons with proper event delegation
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    console.log('Found', tabButtons.length, 'tab buttons');
+    
+    tabButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Get the onclick attribute value
+            const onclickAttr = this.getAttribute('onclick');
+            if (onclickAttr) {
+                console.log('Tab button clicked with onclick:', onclickAttr);
+                // Execute the onclick handler
+                eval(onclickAttr);
+            }
+        });
+    });
+    
+    // Make sure upload modal button works
+    const uploadButtons = document.querySelectorAll('[onclick*="showUploadModal"]');
+    console.log('Found', uploadButtons.length, 'upload buttons');
+    
+    uploadButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Upload button clicked');
+            showUploadModal();
+        });
+    });
 });
 {% endif %}
 </script>
