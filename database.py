@@ -36,7 +36,6 @@ def get_db_connection():
             retryWrites=True,
             tls=True,
             tlsAllowInvalidCertificates=True,
-            tlsInsecure=True,
             maxPoolSize=50,
             minPoolSize=10
         )
@@ -47,10 +46,10 @@ def get_db_connection():
         return _db
     except (ConnectionFailure, ServerSelectionTimeoutError) as e:
         print(f"✗ MongoDB connection failed: {e}")
-        print("Checking MongoDB Atlas configuration...")
-        print("1. Verify IP whitelist includes Render.com IPs (0.0.0.0/0 for testing)")
-        print("2. Check username and password are URL-encoded in connection string")
-        print("3. Ensure database name 'remote_classroom' exists")
+        print("Troubleshooting steps:")
+        print("1. Verify IP whitelist in MongoDB Atlas includes 0.0.0.0/0 or Render IPs")
+        print("2. Check connection string format: mongodb+srv://user:pass@cluster.mongodb.net/database")
+        print("3. Ensure username and password are correct")
         raise Exception(f"Error connecting to MongoDB: {e}")
 
 def init_db():
