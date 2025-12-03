@@ -173,17 +173,17 @@
 </div>
 
 <div class="section-tabs">
-    <button class="tab-btn active" onclick="showTab('materials')">
+    <button class="tab-btn active" onclick="showTab('materials', event)">
         <i class="fas fa-folder"></i> Materials
     </button>
-    <button class="tab-btn" onclick="showTab('ai-assistant')">
+    <button class="tab-btn" onclick="showTab('ai-assistant', event)">
         <i class="fas fa-robot"></i> AI Assistant
     </button>
-    <button class="tab-btn" onclick="showTab('forum')">
+    <button class="tab-btn" onclick="showTab('forum', event)">
         <i class="fas fa-comments"></i> Forum
     </button>
     {% if current_user.role == 'teacher' %}
-    <button class="tab-btn" onclick="showTab('attendance')">
+    <button class="tab-btn" onclick="showTab('attendance', event)">
         <i class="fas fa-calendar-check"></i> Attendance
     </button>
     {% endif %}
@@ -407,7 +407,13 @@
 
 {% block extra_js %}
 <script>
-function showTab(tabName) {
+function showTab(tabName, event) {
+    // Prevent any default behavior
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    
     console.log('showTab called with:', tabName);
     
     // Hide all tab contents
@@ -427,29 +433,20 @@ function showTab(tabName) {
     if (tabContent) {
         console.log('Setting tab active:', tabName);
         tabContent.classList.add('active');
-    } else {
-        console.log('Tab not found:', tabName);
     }
     
-    // Find and activate the clicked button
+    // Find and activate the clicked button - traverse up to find the tab-btn
     if (event && event.target) {
-        let btn = event.target;
-        console.log('Event target:', btn.tagName);
+        let element = event.target;
         
-        // If the click was on the icon, get the parent button
-        if (btn.tagName === 'I') {
-            btn = btn.closest('.tab-btn');
-            console.log('Found parent button via closest');
-        }
-        
-        // If we still don't have a button (clicked on text), find it
-        if (btn && btn.tagName !== 'BUTTON') {
-            btn = btn.closest('.tab-btn');
-        }
-        
-        if (btn && btn.classList) {
-            console.log('Adding active class to button');
-            btn.classList.add('active');
+        // Keep going up until we find a .tab-btn or reach the document
+        while (element && element !== document) {
+            if (element.classList && element.classList.contains('tab-btn')) {
+                console.log('Found button, adding active class');
+                element.classList.add('active');
+                break;
+            }
+            element = element.parentElement;
         }
     }
 }
@@ -609,49 +606,16 @@ function selectNone() {
     });
 }
 
-// Set today's date as default and initialize event listeners
+// Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Page loaded - initializing...');
+    console.log('Page loaded');
     
-    // Set attendance date
+    // Set attendance date to today
     const today = new Date().toISOString().split('T')[0];
     const dateInput = document.getElementById('attendanceDate');
     if (dateInput) {
         dateInput.value = today;
-        console.log('Attendance date set to:', today);
     }
-    
-    // Initialize tab buttons with proper event delegation
-    const tabButtons = document.querySelectorAll('.tab-btn');
-    console.log('Found', tabButtons.length, 'tab buttons');
-    
-    tabButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            // Get the onclick attribute value
-            const onclickAttr = this.getAttribute('onclick');
-            if (onclickAttr) {
-                console.log('Tab button clicked with onclick:', onclickAttr);
-                // Execute the onclick handler
-                eval(onclickAttr);
-            }
-        });
-    });
-    
-    // Make sure upload modal button works
-    const uploadButtons = document.querySelectorAll('[onclick*="showUploadModal"]');
-    console.log('Found', uploadButtons.length, 'upload buttons');
-    
-    uploadButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('Upload button clicked');
-            showUploadModal();
-        });
-    });
 });
 {% endif %}
 </script>
