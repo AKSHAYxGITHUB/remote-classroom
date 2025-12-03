@@ -1,108 +1,288 @@
 import os
-import psycopg2
-from psycopg2.extras import DictCursor
+from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
+from bson.objectid import ObjectId
+from datetime import datetime
+
+# Global MongoDB connection
+_db = None
 
 def get_db_connection():
-    DATABASE_URL = os.environ.get('DATABASE_URL')
-    if DATABASE_URL is None:
-        raise Exception("DATABASE_URL environment variable not set")
+    """Get MongoDB database connection"""
+    global _db
+    
+    MONGODB_URL = os.environ.get('MONGODB_URL') or os.environ.get('DATABASE_URL')
+    
+    if MONGODB_URL is None:
+        raise Exception("MONGODB_URL or DATABASE_URL environment variable not set")
+    
     try:
-        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
-        conn.cursor_factory = DictCursor
-        return conn
-    except psycopg2.OperationalError as e:
-        raise Exception(f"Error connecting to the database: {e}")
+        client = MongoClient(MONGODB_URL, serverSelectionTimeoutMS=5000)
+        # Verify connection
+        client.admin.command('ping')
+        _db = client['remote_classroom']
+        return _db
+    except (ConnectionFailure, ServerSelectionTimeoutError) as e:
+        raise Exception(f"Error connecting to MongoDB: {e}")
 
 def init_db():
-    conn = get_db_connection()
-    cur = conn.cursor()
+    """Initialize MongoDB collections and indexes"""
+    try:
+        db = get_db_connection()
+        
+        # Create collections if they don't exist
+        collections = ['users', 'courses', 'enrollment', 'materials', 'attendance', 'posts', 'replies']
+        
+        for collection_name in collections:
+            if collection_name not in db.list_collection_names():
+                db.create_collection(collection_name)
+        
+        # Create indexes for better query performance
+        db['users'].create_index('username', unique=True)
+        db['enrollment'].create_index([('user_id', 1), ('course_id', 1)], unique=True)
+        db['attendance'].create_index([('student_id', 1), ('course_id', 1), ('date', 1)], unique=True)
+        db['materials'].create_index('course_id')
+        db['posts'].create_index('course_id')
+        db['replies'].create_index('post_id')
+        
+        print("MongoDB collections and indexes initialized successfully.")
+    except Exception as e:
+        raise Exception(f"Error initializing MongoDB: {e}")
 
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            role TEXT NOT NULL CHECK (role IN ('student', 'teacher')),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-    ''')
+# Utility functions for document operations
+def create_user(username, password_hash, role):
+    """Create a new user"""
+    db = get_db_connection()
+    user = {
+        'username': username,
+        'password_hash': password_hash,
+        'role': role,
+        'created_at': datetime.now()
+    }
+    result = db['users'].insert_one(user)
+    return result.inserted_id
 
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS courses (
-            id SERIAL PRIMARY KEY,
-            title TEXT NOT NULL,
-            description TEXT,
-            teacher_id INTEGER NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (teacher_id) REFERENCES users (id)
-        );
-    ''')
+def get_user_by_id(user_id):
+    """Get user by ID"""
+    db = get_db_connection()
+    return db['users'].find_one({'_id': ObjectId(user_id)})
 
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS enrollment (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL,
-            course_id INTEGER NOT NULL,
-            enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id),
-            FOREIGN KEY (course_id) REFERENCES courses (id),
-            UNIQUE(user_id, course_id)
-        );
-    ''')
+def get_user_by_username(username):
+    """Get user by username"""
+    db = get_db_connection()
+    return db['users'].find_one({'username': username})
 
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS materials (
-            id SERIAL PRIMARY KEY,
-            course_id INTEGER NOT NULL,
-            title TEXT NOT NULL,
-            filepath TEXT NOT NULL,
-            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (course_id) REFERENCES courses (id)
-        );
-    ''')
+def create_course(title, description, teacher_id):
+    """Create a new course"""
+    db = get_db_connection()
+    course = {
+        'title': title,
+        'description': description,
+        'teacher_id': ObjectId(teacher_id),
+        'created_at': datetime.now()
+    }
+    result = db['courses'].insert_one(course)
+    return result.inserted_id
 
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS attendance (
-            id SERIAL PRIMARY KEY,
-            student_id INTEGER NOT NULL,
-            course_id INTEGER NOT NULL,
-            date DATE NOT NULL,
-            status TEXT NOT NULL CHECK (status IN ('present', 'absent')),
-            recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (student_id) REFERENCES users (id),
-            FOREIGN KEY (course_id) REFERENCES courses (id),
-            UNIQUE(student_id, course_id, date)
-        );
-    ''')
+def get_course(course_id):
+    """Get course by ID"""
+    db = get_db_connection()
+    return db['courses'].find_one({'_id': ObjectId(course_id)})
 
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS posts (
-            id SERIAL PRIMARY KEY,
-            course_id INTEGER NOT NULL,
-            user_id INTEGER NOT NULL,
-            content TEXT NOT NULL,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (course_id) REFERENCES courses (id),
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        );
-    ''')
+def get_teacher_courses(teacher_id):
+    """Get all courses for a teacher"""
+    db = get_db_connection()
+    return list(db['courses'].aggregate([
+        {'$match': {'teacher_id': ObjectId(teacher_id)}},
+        {'$lookup': {
+            'from': 'enrollment',
+            'localField': '_id',
+            'foreignField': 'course_id',
+            'as': 'enrollments'
+        }},
+        {'$addFields': {'enrolled_count': {'$size': '$enrollments'}}},
+        {'$project': {'enrollments': 0}}
+    ]))
 
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS replies (
-            id SERIAL PRIMARY KEY,
-            post_id INTEGER NOT NULL,
-            user_id INTEGER NOT NULL,
-            content TEXT NOT NULL,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (post_id) REFERENCES posts (id),
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        );
-    ''')
+def get_student_courses(student_id):
+    """Get enrolled courses for a student"""
+    db = get_db_connection()
+    return list(db['courses'].aggregate([
+        {'$lookup': {
+            'from': 'enrollment',
+            'localField': '_id',
+            'foreignField': 'course_id',
+            'as': 'enrollments'
+        }},
+        {'$match': {'enrollments.user_id': ObjectId(student_id)}},
+        {'$lookup': {
+            'from': 'users',
+            'localField': 'teacher_id',
+            'foreignField': '_id',
+            'as': 'teacher'
+        }},
+        {'$addFields': {
+            'teacher_name': {'$arrayElemAt': ['$teacher.username', 0]},
+            'present_count': {
+                '$cond': [
+                    {'$isArray': '$enrollments'},
+                    {'$size': '$enrollments'},
+                    0
+                ]
+            }
+        }},
+        {'$project': {'enrollments': 0, 'teacher': 0}}
+    ]))
 
-    conn.commit()
-    cur.close()
-    conn.close()
-    print("Database schema initialized.")
+def get_available_courses(student_id):
+    """Get courses not enrolled by student"""
+    db = get_db_connection()
+    return list(db['courses'].aggregate([
+        {'$lookup': {
+            'from': 'enrollment',
+            'let': {'course_id': '$_id'},
+            'pipeline': [
+                {'$match': {
+                    'user_id': ObjectId(student_id),
+                    'course_id': '$$course_id'
+                }}
+            ],
+            'as': 'enrollments'
+        }},
+        {'$match': {'enrollments': {'$size': 0}}},
+        {'$lookup': {
+            'from': 'users',
+            'localField': 'teacher_id',
+            'foreignField': '_id',
+            'as': 'teacher'
+        }},
+        {'$addFields': {'teacher_name': {'$arrayElemAt': ['$teacher.username', 0]}}},
+        {'$project': {'enrollments': 0, 'teacher': 0}}
+    ]))
+
+def enroll_student(user_id, course_id):
+    """Enroll student in course"""
+    db = get_db_connection()
+    enrollment = {
+        'user_id': ObjectId(user_id),
+        'course_id': ObjectId(course_id),
+        'enrolled_at': datetime.now()
+    }
+    db['enrollment'].insert_one(enrollment)
+
+def is_enrolled(user_id, course_id):
+    """Check if student is enrolled in course"""
+    db = get_db_connection()
+    return db['enrollment'].find_one({'user_id': ObjectId(user_id), 'course_id': ObjectId(course_id)}) is not None
+
+def get_course_materials(course_id):
+    """Get all materials for a course"""
+    db = get_db_connection()
+    return list(db['materials'].find({'course_id': ObjectId(course_id)}))
+
+def add_material(course_id, title, filepath):
+    """Add material to course"""
+    db = get_db_connection()
+    material = {
+        'course_id': ObjectId(course_id),
+        'title': title,
+        'filepath': filepath,
+        'uploaded_at': datetime.now()
+    }
+    result = db['materials'].insert_one(material)
+    return result.inserted_id
+
+def get_material(material_id):
+    """Get material by ID"""
+    db = get_db_connection()
+    return db['materials'].find_one({'_id': ObjectId(material_id)})
+
+def get_course_posts(course_id):
+    """Get all posts for a course"""
+    db = get_db_connection()
+    return list(db['posts'].aggregate([
+        {'$match': {'course_id': ObjectId(course_id)}},
+        {'$lookup': {
+            'from': 'users',
+            'localField': 'user_id',
+            'foreignField': '_id',
+            'as': 'user'
+        }},
+        {'$lookup': {
+            'from': 'replies',
+            'localField': '_id',
+            'foreignField': 'post_id',
+            'as': 'replies'
+        }},
+        {'$addFields': {
+            'username': {'$arrayElemAt': ['$user.username', 0]},
+            'reply_count': {'$size': '$replies'}
+        }},
+        {'$project': {'user': 0, 'replies': 0}},
+        {'$sort': {'timestamp': -1}}
+    ]))
+
+def create_post(course_id, user_id, content):
+    """Create a new post"""
+    db = get_db_connection()
+    post = {
+        'course_id': ObjectId(course_id),
+        'user_id': ObjectId(user_id),
+        'content': content,
+        'timestamp': datetime.now()
+    }
+    result = db['posts'].insert_one(post)
+    return result.inserted_id
+
+def create_reply(post_id, user_id, content):
+    """Create a reply to a post"""
+    db = get_db_connection()
+    reply = {
+        'post_id': ObjectId(post_id),
+        'user_id': ObjectId(user_id),
+        'content': content,
+        'timestamp': datetime.now()
+    }
+    result = db['replies'].insert_one(reply)
+    return result.inserted_id
+
+def record_attendance(student_id, course_id, date, status):
+    """Record attendance"""
+    db = get_db_connection()
+    attendance = {
+        'student_id': ObjectId(student_id),
+        'course_id': ObjectId(course_id),
+        'date': date,
+        'status': status,
+        'recorded_at': datetime.now()
+    }
+    db['attendance'].update_one(
+        {'student_id': ObjectId(student_id), 'course_id': ObjectId(course_id), 'date': date},
+        {'$set': attendance},
+        upsert=True
+    )
+
+def get_course_students(course_id):
+    """Get all students enrolled in a course"""
+    db = get_db_connection()
+    return list(db['users'].aggregate([
+        {'$lookup': {
+            'from': 'enrollment',
+            'localField': '_id',
+            'foreignField': 'user_id',
+            'as': 'enrollments'
+        }},
+        {'$match': {
+            'role': 'student',
+            'enrollments.course_id': ObjectId(course_id)
+        }},
+        {'$project': {'enrollments': 0}}
+    ]))
+
+def delete_attendance_for_date(course_id, date):
+    """Delete all attendance records for a course on a specific date"""
+    db = get_db_connection()
+    db['attendance'].delete_many({'course_id': ObjectId(course_id), 'date': date})
 
 if __name__ == '__main__':
     init_db()

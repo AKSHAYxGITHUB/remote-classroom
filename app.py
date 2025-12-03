@@ -5,8 +5,14 @@ from werkzeug.utils import secure_filename
 import os
 from datetime import datetime, date
 import json
-from database import init_db, get_db_connection
-import psycopg2
+from database import (
+    init_db, get_db_connection, get_user_by_id, get_user_by_username,
+    create_user, create_course, get_course, get_teacher_courses, get_student_courses,
+    get_available_courses, enroll_student, is_enrolled, get_course_materials,
+    add_material, get_material, get_course_posts, create_post, create_reply,
+    record_attendance, get_course_students, delete_attendance_for_date
+)
+from bson.objectid import ObjectId
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-default-fallback-secret-key')
@@ -26,14 +32,9 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute('SELECT * FROM users WHERE id = %s', (user_id,))
-    user = cur.fetchone()
-    cur.close()
-    conn.close()
-    if user:
-        return User(user['id'], user['username'], user['role'])
+    user_doc = get_user_by_id(user_id)
+    if user_doc:
+        return User(str(user_doc['_id']), user_doc['username'], user_doc['role'])
     return None
 
 @app.route('/')
@@ -46,15 +47,10 @@ def login():
         username = request.form['username']
         password = request.form['password']
 
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute('SELECT * FROM users WHERE username = %s', (username,))
-        user = cur.fetchone()
-        cur.close()
-        conn.close()
+        user = get_user_by_username(username)
 
         if user and check_password_hash(user['password_hash'], password):
-            user_obj = User(user['id'], user['username'], user['role'])
+            user_obj = User(str(user['_id']), user['username'], user['role'])
             login_user(user_obj)
             return redirect(url_for('dashboard'))
         else:
@@ -69,23 +65,13 @@ def register():
         password = request.form['password']
         role = request.form['role']
 
-        conn = get_db_connection()
-        cur = conn.cursor()
-
-        cur.execute('SELECT * FROM users WHERE username = %s', (username,))
-        existing_user = cur.fetchone()
+        existing_user = get_user_by_username(username)
         if existing_user:
             flash('Username already exists')
-            cur.close()
-            conn.close()
             return render_template('register.html')
 
         password_hash = generate_password_hash(password)
-        cur.execute('INSERT INTO users (username, password_hash, role) VALUES (%s, %s, %s)',
-                    (username, password_hash, role))
-        conn.commit()
-        cur.close()
-        conn.close()
+        create_user(username, password_hash, role)
 
         flash('Registration successful! Please login.')
         return redirect(url_for('login'))
@@ -101,50 +87,18 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    conn = get_db_connection()
-    cur = conn.cursor()
-
     if current_user.role == 'teacher':
-        cur.execute('''
-            SELECT c.*, COUNT(e.user_id) as enrolled_count
-            FROM courses c
-            LEFT JOIN enrollment e ON c.id = e.course_id
-            WHERE c.teacher_id = %s
-            GROUP BY c.id
-        ''', (current_user.id,))
-        courses = cur.fetchall()
+        courses = get_teacher_courses(current_user.id)
         available_courses = []
-
     else:
-        cur.execute('''
-            SELECT c.*, u.username as teacher_name,
-            (SELECT COUNT(*) FROM attendance WHERE student_id = %s AND course_id = c.id AND status = 'present') as present_count,
-            (SELECT COUNT(*) FROM attendance WHERE student_id = %s AND course_id = c.id) as total_attendance
-            FROM courses c
-            JOIN users u ON c.teacher_id = u.id
-            JOIN enrollment e ON c.id = e.course_id
-            WHERE e.user_id = %s
-        ''', (current_user.id, current_user.id, current_user.id))
-        enrolled_courses = cur.fetchall()
+        courses = get_student_courses(current_user.id)
+        available_courses = get_available_courses(current_user.id)
 
-        cur.execute('''
-            SELECT c.*, u.username as teacher_name
-            FROM courses c
-            JOIN users u ON c.teacher_id = u.id
-            WHERE c.id NOT IN (
-                SELECT course_id FROM enrollment WHERE user_id = %s
-            )
-        ''', (current_user.id,))
-        available_courses = cur.fetchall()
-        courses = enrolled_courses
-
-    cur.close()
-    conn.close()
     return render_template('dashboard.html', courses=courses, available_courses=available_courses)
 
 @app.route('/create_course', methods=['POST'])
 @login_required
-def create_course():
+def create_course_route():
     if current_user.role != 'teacher':
         flash('Only teachers can create courses')
         return redirect(url_for('dashboard'))
@@ -152,80 +106,47 @@ def create_course():
     title = request.form['title']
     description = request.form['description']
 
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute('INSERT INTO courses (title, description, teacher_id) VALUES (%s, %s, %s)',
-                (title, description, current_user.id))
-    conn.commit()
-    cur.close()
-    conn.close()
+    create_course(title, description, current_user.id)
 
     flash('Course created successfully!')
     return redirect(url_for('dashboard'))
 
-@app.route('/course/<int:course_id>')
+@app.route('/course/<course_id>')
 @login_required
 def course(course_id):
-    conn = get_db_connection()
-    cur = conn.cursor()
+    try:
+        course_data = get_course(course_id)
 
-    cur.execute('''
-        SELECT c.*, u.username as teacher_name
-        FROM courses c
-        JOIN users u ON c.teacher_id = u.id
-        WHERE c.id = %s
-    ''', (course_id,))
-    course_data = cur.fetchone()
-
-    if not course_data:
-        flash('Course not found')
-        cur.close()
-        conn.close()
-        return redirect(url_for('dashboard'))
-
-    if current_user.role == 'student':
-        cur.execute('SELECT * FROM enrollment WHERE user_id = %s AND course_id = %s',
-                    (current_user.id, course_id))
-        if not cur.fetchone():
-            flash('You are not enrolled in this course')
-            cur.close()
-            conn.close()
+        if not course_data:
+            flash('Course not found')
             return redirect(url_for('dashboard'))
-    elif current_user.role == 'teacher' and course_data['teacher_id'] != current_user.id:
-        flash('You do not have access to this course')
-        cur.close()
-        conn.close()
+
+        if current_user.role == 'student':
+            if not is_enrolled(current_user.id, course_id):
+                flash('You are not enrolled in this course')
+                return redirect(url_for('dashboard'))
+        elif current_user.role == 'teacher' and str(course_data['teacher_id']) != current_user.id:
+            flash('You do not have access to this course')
+            return redirect(url_for('dashboard'))
+
+        materials = get_course_materials(course_id)
+        posts = get_course_posts(course_id)
+
+        students = []
+        if current_user.role == 'teacher':
+            students = get_course_students(course_id)
+
+        # Add teacher name
+        teacher = get_user_by_id(str(course_data['teacher_id']))
+        course_data['teacher_name'] = teacher['username'] if teacher else 'Unknown'
+        
+        return render_template('course.html', course=course_data, materials=materials, posts=posts, students=students)
+    except Exception as e:
+        flash(f'Error loading course: {str(e)}')
         return redirect(url_for('dashboard'))
 
-    cur.execute('SELECT * FROM materials WHERE course_id = %s', (course_id,))
-    materials = cur.fetchall()
 
-    cur.execute('''
-        SELECT p.*, u.username, COUNT(r.id) as reply_count
-        FROM posts p
-        JOIN users u ON p.user_id = u.id
-        LEFT JOIN replies r ON p.id = r.post_id
-        WHERE p.course_id = %s
-        GROUP BY p.id, u.username, p.content, p.timestamp
-        ORDER BY p.timestamp DESC
-    ''', (course_id,))
-    posts = cur.fetchall()
-
-    students = []
-    if current_user.role == 'teacher':
-        cur.execute('''
-            SELECT u.* FROM users u
-            JOIN enrollment e ON u.id = e.user_id
-            WHERE e.course_id = %s AND u.role = 'student'
-        ''', (course_id,))
-        students = cur.fetchall()
-
-    cur.close()
-    conn.close()
-    return render_template('course.html', course=course_data, materials=materials, posts=posts, students=students)
-
-
-@app.route('/upload_material/<int:course_id>', methods=['POST'])
+@app.route('/upload_material/<course_id>', methods=['POST'])
 @login_required
 def upload_material(course_id):
     if current_user.role != 'teacher':
@@ -245,57 +166,41 @@ def upload_material(course_id):
 
         title = request.form.get('title', filename)
 
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute('INSERT INTO materials (course_id, title, filepath) VALUES (%s, %s, %s)',
-                    (course_id, title, filepath))
-        conn.commit()
-        cur.close()
-        conn.close()
+        add_material(course_id, title, filepath)
 
         return jsonify({'success': True, 'message': 'Material uploaded successfully'})
 
-@app.route('/download_material/<int:material_id>')
+@app.route('/download_material/<material_id>')
 @login_required
 def download_material(material_id):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute('SELECT * FROM materials WHERE id = %s', (material_id,))
-    material = cur.fetchone()
-    cur.close()
-    conn.close()
+    try:
+        material = get_material(material_id)
 
-    if not material:
-        flash('Material not found')
+        if not material:
+            flash('Material not found')
+            return redirect(url_for('dashboard'))
+
+        return send_file(material['filepath'], as_attachment=True)
+    except Exception as e:
+        flash(f'Error downloading material: {str(e)}')
         return redirect(url_for('dashboard'))
 
-    return send_file(material['filepath'], as_attachment=True)
-
-@app.route('/enroll/<int:course_id>')
+@app.route('/enroll/<course_id>')
 @login_required
 def enroll(course_id):
     if current_user.role != 'student':
         flash('Only students can enroll in courses')
         return redirect(url_for('dashboard'))
 
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    cur.execute('SELECT * FROM enrollment WHERE user_id = %s AND course_id = %s',
-                (current_user.id, course_id))
-    if cur.fetchone():
+    if is_enrolled(current_user.id, course_id):
         flash('You are already enrolled in this course')
     else:
-        cur.execute('INSERT INTO enrollment (user_id, course_id) VALUES (%s, %s)',
-                    (current_user.id, course_id))
-        conn.commit()
+        enroll_student(current_user.id, course_id)
         flash('Successfully enrolled in the course!')
 
-    cur.close()
-    conn.close()
     return redirect(url_for('dashboard'))
 
-@app.route('/take_attendance/<int:course_id>', methods=['POST'])
+@app.route('/take_attendance/<course_id>', methods=['POST'])
 @login_required
 def take_attendance(course_id):
     if current_user.role != 'teacher':
@@ -304,27 +209,13 @@ def take_attendance(course_id):
     attendance_date = request.form['date']
     student_ids = request.form.getlist('students')
 
-    conn = get_db_connection()
-    cur = conn.cursor()
+    students = get_course_students(course_id)
+    
+    delete_attendance_for_date(course_id, attendance_date)
 
-    cur.execute('''
-        SELECT u.id FROM users u
-        JOIN enrollment e ON u.id = e.user_id
-        WHERE e.course_id = %s AND u.role = 'student'
-    ''', (course_id,))
-    all_students = cur.fetchall()
-
-    cur.execute('DELETE FROM attendance WHERE course_id = %s AND date = %s',
-                (course_id, attendance_date))
-
-    for student in all_students:
-        status = 'present' if str(student['id']) in student_ids else 'absent'
-        cur.execute('INSERT INTO attendance (student_id, course_id, date, status) VALUES (%s, %s, %s, %s)',
-                    (student['id'], course_id, attendance_date, status))
-
-    conn.commit()
-    cur.close()
-    conn.close()
+    for student in students:
+        status = 'present' if str(student['_id']) in student_ids else 'absent'
+        record_attendance(str(student['_id']), course_id, attendance_date, status)
 
     return jsonify({'success': True, 'message': 'Attendance recorded successfully'})
 
@@ -338,13 +229,7 @@ def ask_ai():
     if not question:
         return jsonify({'error': 'No question provided'}), 400
 
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute('SELECT * FROM materials WHERE course_id = %s', (course_id,))
-    materials = cur.fetchall()
-    cur.close()
-    conn.close()
-
+    materials = get_course_materials(course_id)
     context = "Course materials context: " + " ".join([m['title'] for m in materials])
 
     try:
@@ -353,34 +238,22 @@ def ask_ai():
     except Exception as e:
         return jsonify({'error': 'AI service temporarily unavailable'}), 500
 
-@app.route('/post_question/<int:course_id>', methods=['POST'])
+@app.route('/post_question/<course_id>', methods=['POST'])
 @login_required
 def post_question(course_id):
     content = request.form['content']
 
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute('INSERT INTO posts (course_id, user_id, content, timestamp) VALUES (%s, %s, %s, %s)',
-                (course_id, current_user.id, content, datetime.now()))
-    conn.commit()
-    cur.close()
-    conn.close()
+    create_post(course_id, current_user.id, content)
 
     return redirect(url_for('course', course_id=course_id))
 
-@app.route('/post_reply/<int:post_id>', methods=['POST'])
+@app.route('/post_reply/<post_id>', methods=['POST'])
 @login_required
 def post_reply(post_id):
     content = request.form['content']
     course_id = request.form['course_id']
 
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute('INSERT INTO replies (post_id, user_id, content, timestamp) VALUES (%s, %s, %s, %s)',
-                (post_id, current_user.id, content, datetime.now()))
-    conn.commit()
-    cur.close()
-    conn.close()
+    create_reply(post_id, current_user.id, content)
 
     return redirect(url_for('course', course_id=course_id))
 
