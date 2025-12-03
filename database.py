@@ -17,7 +17,16 @@ def get_db_connection():
         raise Exception("MONGODB_URL or DATABASE_URL environment variable not set")
     
     try:
-        client = MongoClient(MONGODB_URL, serverSelectionTimeoutMS=5000)
+        # Add SSL/TLS options for MongoDB Atlas
+        client = MongoClient(
+            MONGODB_URL,
+            serverSelectionTimeoutMS=10000,
+            connectTimeoutMS=10000,
+            socketTimeoutMS=10000,
+            retryWrites=True,
+            tls=True,
+            tlsAllowInvalidCertificates=True  # For development/testing
+        )
         # Verify connection
         client.admin.command('ping')
         _db = client['remote_classroom']
