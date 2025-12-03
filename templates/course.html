@@ -32,6 +32,13 @@
         cursor: pointer;
         transition: all 0.3s ease;
         white-space: nowrap;
+        color: #6B7280;
+        pointer-events: auto;
+    }
+    
+    .tab-btn:hover {
+        background: #F3F4F6;
+        color: #374151;
     }
     
     .tab-btn.active {
@@ -366,22 +373,27 @@
 
 <!-- Upload Modal -->
 {% if current_user.role == 'teacher' %}
-<div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-    <div style="background: white; padding: 2rem; border-radius: 16px; width: 90%; max-width: 500px;">
-        <h3 style="margin-bottom: 1.5rem;">Upload Course Material</h3>
+<div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; flex-direction: column;">
+    <div style="background: white; padding: 2rem; border-radius: 16px; width: 90%; max-width: 500px; position: relative; z-index: 1001;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h3 style="margin: 0;">Upload Course Material</h3>
+            <button type="button" onclick="hideUploadModal()" style="border: none; background: none; font-size: 1.5rem; cursor: pointer; color: #6B7280;">
+                &times;
+            </button>
+        </div>
         
         <form id="uploadForm" enctype="multipart/form-data">
             <div class="form-group">
-                <label for="title">Material Title</label>
+                <label for="materialTitle">Material Title</label>
                 <input type="text" id="materialTitle" name="title" required>
             </div>
             
             <div class="form-group">
-                <label for="file">Select File</label>
+                <label for="materialFile">Select File</label>
                 <input type="file" id="materialFile" name="file" accept=".pdf,.doc,.docx,.txt,.ppt,.pptx" required>
             </div>
             
-            <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem;">
                 <button type="button" onclick="hideUploadModal()" class="btn btn-outline">Cancel</button>
                 <button type="button" onclick="uploadMaterial()" class="btn btn-primary">
                     <i class="fas fa-upload"></i> Upload
@@ -407,10 +419,15 @@ function showTab(tabName) {
     });
     
     // Show selected tab
-    document.getElementById(tabName).classList.add('active');
+    const tabContent = document.getElementById(tabName);
+    if (tabContent) {
+        tabContent.classList.add('active');
+    }
     
     // Add active class to clicked button
-    event.target.classList.add('active');
+    if (event && event.target) {
+        event.target.classList.add('active');
+    }
 }
 
 async function sendMessage() {
@@ -495,6 +512,14 @@ function showUploadModal() {
 function hideUploadModal() {
     document.getElementById('uploadModal').style.display = 'none';
 }
+
+// Close modal when clicking outside
+document.addEventListener('click', function(e) {
+    const modal = document.getElementById('uploadModal');
+    if (e.target === modal) {
+        hideUploadModal();
+    }
+});
 
 async function uploadMaterial() {
     const form = document.getElementById('uploadForm');
